@@ -42,9 +42,11 @@ const balanceSheetFields = new Set([
 let latestReport = "";
 let latestCsv = "";
 let latestJson = "";
+let selectedFiles = [];
 
 const form = document.querySelector("#analysis-form");
 const imagesInput = document.querySelector("#images");
+const clearImages = document.querySelector("#clear-images");
 const preview = document.querySelector("#image-preview");
 const statusEl = document.querySelector("#status");
 const reportEl = document.querySelector("#report");
@@ -53,14 +55,39 @@ const downloadCsv = document.querySelector("#download-csv");
 const downloadJson = document.querySelector("#download-json");
 
 imagesInput.addEventListener("change", () => {
+  selectedFiles = mergeFiles(selectedFiles, Array.from(imagesInput.files));
+  imagesInput.value = "";
+  renderPreview();
+});
+
+clearImages.addEventListener("click", () => {
+  selectedFiles = [];
+  imagesInput.value = "";
+  renderPreview();
+});
+
+function renderPreview() {
   preview.innerHTML = "";
-  for (const file of imagesInput.files) {
+  for (const file of selectedFiles) {
     const image = document.createElement("img");
     image.alt = file.name;
     image.src = URL.createObjectURL(file);
     preview.append(image);
   }
-});
+}
+
+function mergeFiles(existing, incoming) {
+  const files = [...existing];
+  const seen = new Set(existing.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+  for (const file of incoming) {
+    const key = `${file.name}:${file.size}:${file.lastModified}`;
+    if (!seen.has(key)) {
+      files.push(file);
+      seen.add(key);
+    }
+  }
+  return files;
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -71,7 +98,7 @@ form.addEventListener("submit", async (event) => {
     const apiKey = document.querySelector("#api-key").value.trim();
     const company = document.querySelector("#company").value.trim();
     const model = document.querySelector("#model").value.trim();
-    const files = Array.from(imagesInput.files);
+    const files = selectedFiles;
 
     if (!files.length) {
       throw new Error("請先選擇財報截圖。");
