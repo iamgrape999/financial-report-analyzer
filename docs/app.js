@@ -54,6 +54,9 @@ const downloadReport = document.querySelector("#download-report");
 const downloadCsv = document.querySelector("#download-csv");
 const downloadJson = document.querySelector("#download-json");
 
+form.noValidate = true;
+imagesInput.required = false;
+
 imagesInput.addEventListener("change", () => {
   selectedFiles = mergeFiles(selectedFiles, Array.from(imagesInput.files));
   renderPreview();
