@@ -69,10 +69,21 @@ powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -I
 
 - 讀取截圖
 - 產生 `extracted_financials.csv`
+- 產生 `extracted_sources.json`
 - 產生 `screenshot_report.md`
 - 上傳到 GitHub 的 `reports/<時間>-<公司名稱>/` 資料夾
 
-一鍵腳本預設採嚴格模式。如果程式偵測到時序、資產負債表小計、或可疑比率問題，會先產生本機報告但停止上傳，請人工覆核 `資料品質警示` 後再決定是否上傳。
+一鍵腳本預設採嚴格模式。如果程式偵測到時序、資產負債表小計、可疑比率，或核心欄位沒有對應到明確會計科目，會先產生本機報告但停止上傳，請人工覆核後再決定是否上傳。
+
+台灣財報截圖會強制檢查下列來源科目：
+
+- `total_assets` 必須來自 `資產總計` / `資產總額` / `資產合計`
+- `total_liabilities` 必須來自 `負債總計` / `負債總額` / `負債合計`
+- `shareholders_equity` 必須來自 `權益總計` / `權益總額` / `權益合計`
+- `current_assets` 必須來自 `流動資產合計` / `流動資產總計` / `流動資產總額`
+- `current_liabilities` 必須來自 `流動負債合計` / `流動負債總計` / `流動負債總額`
+
+若 Gemini 抓到的數字沒有這些來源標籤，程式會直接判定失敗，不上傳 GitHub。
 
 若你已人工確認警示可接受，可關閉嚴格模式：
 
