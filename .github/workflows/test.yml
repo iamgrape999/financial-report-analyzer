@@ -1,0 +1,24 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sample-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Run sample analysis
+        run: python financial_report_analyzer.py sample_financials.csv -c "Sample Co" -o sample_report.md
+
+      - name: Verify report output
+        run: test -s sample_report.md
