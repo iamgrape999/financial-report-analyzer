@@ -128,6 +128,17 @@ button {
   font-weight: 800;
 }
 
+button.secondary {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #fff;
+}
+
+button.secondary:hover:not(:disabled) {
+  color: var(--accent-strong);
+  background: #eef7f6;
+}
+
 button:hover:not(:disabled) {
   background: var(--accent-strong);
 }
