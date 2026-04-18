@@ -1,0 +1,64 @@
+[
+  {
+    "period": "114Q1",
+    "sources": {
+      "revenue": "營業收入淨額",
+      "gross_profit": "營業毛利",
+      "operating_income": "營業利益",
+      "net_income": "本期淨利",
+      "total_assets": "資產總計",
+      "total_liabilities": "負債總計",
+      "shareholders_equity": "權益總計",
+      "current_assets": "流動資產合計",
+      "current_liabilities": "流動負債合計",
+      "inventory": "存貨",
+      "operating_cash_flow": null,
+      "capital_expenditure": null
+    },
+    "codes": {
+      "revenue": "4000",
+      "gross_profit": "5950",
+      "operating_income": "6900",
+      "net_income": "8200",
+      "total_assets": "1XXX",
+      "total_liabilities": "2XXX",
+      "shareholders_equity": "3XXX",
+      "current_assets": "11XX",
+      "current_liabilities": "21XX",
+      "inventory": "18XX",
+      "operating_cash_flow": null,
+      "capital_expenditure": null
+    }
+  },
+  {
+    "period": "113Q1",
+    "sources": {
+      "revenue": "營業收入淨額",
+      "gross_profit": "營業毛利",
+      "operating_income": "營業利益",
+      "net_income": "本期淨利",
+      "total_assets": "資產總計",
+      "total_liabilities": "負債總計",
+      "shareholders_equity": "權益總計",
+      "current_assets": "流動資產合計",
+      "current_liabilities": "流動負債合計",
+      "inventory": "存貨",
+      "operating_cash_flow": null,
+      "capital_expenditure": null
+    },
+    "codes": {
+      "revenue": "4000",
+      "gross_profit": "5950",
+      "operating_income": "6900",
+      "net_income": "8200",
+      "total_assets": "1XXX",
+      "total_liabilities": "2XXX",
+      "shareholders_equity": "3XXX",
+      "current_assets": "11XX",
+      "current_liabilities": "21XX",
+      "inventory": "18XX",
+      "operating_cash_flow": null,
+      "capital_expenditure": null
+    }
+  }
+]
