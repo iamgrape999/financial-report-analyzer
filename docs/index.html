@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>財報截圖分析器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <p class="eyebrow">Financial Report Analyzer</p>
+        <h1>財報截圖分析器</h1>
+        <p>
+          上傳資產負債表與綜合損益表截圖，產生標準化 CSV 與中文財報分析。
+        </p>
+      </section>
+
+      <section class="workspace">
+        <form id="analysis-form" class="control-panel">
+          <label>
+            Gemini API key
+            <input
+              id="api-key"
+              name="api-key"
+              type="password"
+              autocomplete="off"
+              placeholder="AIza..."
+              required
+            />
+          </label>
+
+          <label>
+            公司名稱
+            <input
+              id="company"
+              name="company"
+              type="text"
+              value="台灣積體電路製造股份有限公司"
+              required
+            />
+          </label>
+
+          <label>
+            Gemini 模型
+            <input id="model" name="model" type="text" value="gemini-2.5-flash" required />
+          </label>
+
+          <label class="file-drop">
+            財報截圖
+            <input id="images" name="images" type="file" accept="image/*" multiple required />
+            <span>選擇 PNG / JPG 截圖，可一次選多張</span>
+          </label>
+
+          <button type="submit">產生分析</button>
+          <p id="status" class="status">尚未開始</p>
+        </form>
+
+        <section class="preview-zone">
+          <div>
+            <h2>圖片預覽</h2>
+            <div id="image-preview" class="image-preview"></div>
+          </div>
+
+          <div>
+            <h2>輸出</h2>
+            <div class="actions">
+              <button id="download-report" type="button" disabled>下載 Markdown</button>
+              <button id="download-csv" type="button" disabled>下載 CSV</button>
+              <button id="download-json" type="button" disabled>下載 JSON</button>
+            </div>
+            <pre id="report" class="report-output">分析結果會顯示在這裡。</pre>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
