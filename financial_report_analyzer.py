@@ -29,8 +29,6 @@ REQUIRED_COLUMNS = {
     "current_assets",
     "current_liabilities",
     "inventory",
-    "operating_cash_flow",
-    "capital_expenditure",
 }
 
 
@@ -47,8 +45,8 @@ class PeriodData:
     current_assets: float
     current_liabilities: float
     inventory: float
-    operating_cash_flow: float
-    capital_expenditure: float
+    operating_cash_flow: Optional[float] = None
+    capital_expenditure: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -64,7 +62,7 @@ class MetricRow:
     debt_to_equity: Optional[float]
     asset_turnover: Optional[float]
     ocf_to_net_income: Optional[float]
-    free_cash_flow: float
+    free_cash_flow: Optional[float]
     revenue_growth: Optional[float]
     net_income_growth: Optional[float]
 
@@ -76,6 +74,15 @@ def parse_money(value: str) -> float:
     if cleaned.startswith("(") and cleaned.endswith(")"):
         cleaned = "-" + cleaned[1:-1]
     return float(cleaned)
+
+
+def parse_optional_money(value: Optional[str]) -> Optional[float]:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if cleaned in {"", "-", "N/A", "NA", "null", "None"}:
+        return None
+    return parse_money(cleaned)
 
 
 def safe_divide(numerator: float, denominator: float) -> Optional[float]:
@@ -114,8 +121,12 @@ def load_csv(path: Path) -> list[PeriodData]:
                         current_assets=parse_money(row["current_assets"]),
                         current_liabilities=parse_money(row["current_liabilities"]),
                         inventory=parse_money(row["inventory"]),
-                        operating_cash_flow=parse_money(row["operating_cash_flow"]),
-                        capital_expenditure=parse_money(row["capital_expenditure"]),
+                        operating_cash_flow=parse_optional_money(
+                            row.get("operating_cash_flow")
+                        ),
+                        capital_expenditure=parse_optional_money(
+                            row.get("capital_expenditure")
+                        ),
                     )
                 )
             except (KeyError, ValueError) as exc:
@@ -146,8 +157,17 @@ def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
                 ),
                 debt_to_equity=safe_divide(row.total_liabilities, row.shareholders_equity),
                 asset_turnover=safe_divide(row.revenue, row.total_assets),
-                ocf_to_net_income=safe_divide(row.operating_cash_flow, row.net_income),
-                free_cash_flow=row.operating_cash_flow - row.capital_expenditure,
+                ocf_to_net_income=(
+                    safe_divide(row.operating_cash_flow, row.net_income)
+                    if row.operating_cash_flow is not None
+                    else None
+                ),
+                free_cash_flow=(
+                    row.operating_cash_flow - row.capital_expenditure
+                    if row.operating_cash_flow is not None
+                    and row.capital_expenditure is not None
+                    else None
+                ),
                 revenue_growth=(
                     safe_divide(row.revenue - previous.revenue, previous.revenue)
                     if previous
@@ -218,7 +238,7 @@ def build_findings(metrics: list[MetricRow]) -> list[str]:
     )
     findings.append(
         f"自由現金流為 {number(latest.free_cash_flow)}，營業現金流對淨利比為 "
-        f"{number(latest.ocf_to_net_income)}。"
+        f"{number(latest.ocf_to_net_income)}；若來源截圖未包含現金流量表，這兩項會顯示 N/A。"
     )
 
     return findings
@@ -238,7 +258,7 @@ def build_risk_flags(metrics: list[MetricRow]) -> list[str]:
         flags.append("負債權益比高於 2，槓桿偏高。")
     if latest.ocf_to_net_income is not None and latest.ocf_to_net_income < 0.8:
         flags.append("營業現金流相對淨利偏弱，需檢查盈餘品質。")
-    if latest.free_cash_flow < 0:
+    if latest.free_cash_flow is not None and latest.free_cash_flow < 0:
         flags.append("扣除資本支出後自由現金流為負。")
 
     return flags or ["目前未觸發主要規則式風險旗標。"]
