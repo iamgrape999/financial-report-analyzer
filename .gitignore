@@ -16,6 +16,7 @@ financial_analysis_report.md
 financial_screenshot_report.md
 extracted_financials.csv
 extracted_sources.json
+extracted_raw.json
 
 # Local editor files
 .idea/
