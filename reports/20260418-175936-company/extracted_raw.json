@@ -1,0 +1,217 @@
+{
+  "company": "台灣積體電路製造股份有限公司",
+  "currency_unit": "新台幣仟元",
+  "periods": [
+    {
+      "period": "114年1月1日至3月31日",
+      "revenue": 839253664,
+      "gross_profit": 493395076,
+      "operating_income": 407080808,
+      "net_income": 361564124,
+      "total_assets": 7333087420,
+      "total_liabilities": 4323020846,
+      "shareholders_equity": 3010066574,
+      "current_assets": 3333420539,
+      "current_liabilities": 1973882750,
+      "inventory": 300772972,
+      "operating_cash_flow": null,
+      "capital_expenditure": null,
+      "sources": {
+        "revenue": "營業收入淨額",
+        "gross_profit": "營業毛利",
+        "operating_income": "營業利益",
+        "net_income": "本期淨利歸屬於母公司業主",
+        "total_assets": "資產總計",
+        "total_liabilities": "負債總計",
+        "shareholders_equity": "權益總計",
+        "current_assets": "流動資產合計",
+        "current_liabilities": "流動負債合計",
+        "inventory": "存貨",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      },
+      "codes": {
+        "revenue": "4000",
+        "gross_profit": "5950",
+        "operating_income": "6900",
+        "net_income": "8610",
+        "total_assets": "1XXX",
+        "total_liabilities": "2XXX",
+        "shareholders_equity": "3XXX",
+        "current_assets": "11XX",
+        "current_liabilities": "21XX",
+        "inventory": "14XX",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      },
+      "evidence": {
+        "revenue": {
+          "column_header": "114年1月1日至3月31日",
+          "amount_text": "839,253,664",
+          "row_values_text": "4000 營業收入淨額(附註二十三、三一及三七) 839,253,664 100 592,644,201 100"
+        },
+        "gross_profit": {
+          "column_header": "114年1月1日至3月31日",
+          "amount_text": "493,395,076",
+          "row_values_text": "5950 營業毛利 493,395,076 59 314,505,269 53"
+        },
+        "operating_income": {
+          "column_header": "114年1月1日至3月31日",
+          "amount_text": "407,080,808",
+          "row_values_text": "6900 營業利益(附註三七) 407,080,808 49 249,018,306 42"
+        },
+        "net_income": {
+          "column_header": "114年1月1日至3月31日",
+          "amount_text": "361,564,124",
+          "row_values_text": "8610 母公司業主 361,564,124 43 225,484,877 38"
+        },
+        "total_assets": {
+          "column_header": "114年3月31日",
+          "amount_text": "7,333,087,420",
+          "row_values_text": "1XXX 資產總計 7,333,087,420 100 6,691,958,000 100 5,797,893,082 100"
+        },
+        "total_liabilities": {
+          "column_header": "114年3月31日",
+          "amount_text": "4,323,020,846",
+          "row_values_text": "2XXX 負債總計 4,323,020,846 64 3,988,482,883 64 3,665,714,254 63"
+        },
+        "shareholders_equity": {
+          "column_header": "114年3月31日",
+          "amount_text": "3,010,066,574",
+          "row_values_text": "3XXX 權益總計 3,010,066,574 45 2,703,475,117 44 2,132,178,828 37"
+        },
+        "current_assets": {
+          "column_header": "114年3月31日",
+          "amount_text": "3,333,420,539",
+          "row_values_text": "11XX 流動資產合計 3,333,420,539 42 2,873,810,480 43 2,499,699,578 43"
+        },
+        "current_liabilities": {
+          "column_header": "114年3月31日",
+          "amount_text": "1,973,882,750",
+          "row_values_text": "21XX 流動負債合計 1,973,882,750 29 1,720,414,904 28 1,279,174,434 22"
+        },
+        "inventory": {
+          "column_header": "114年3月31日",
+          "amount_text": "300,772,972",
+          "row_values_text": "14XX 存貨 (附註六) 300,772,972 4 287,848,810 4 320,688,526 5"
+        },
+        "operating_cash_flow": {
+          "column_header": null,
+          "amount_text": null,
+          "row_values_text": null
+        },
+        "capital_expenditure": {
+          "column_header": null,
+          "amount_text": null,
+          "row_values_text": null
+        }
+      }
+    },
+    {
+      "period": "113年1月1日至3月31日",
+      "revenue": 592644201,
+      "gross_profit": 314505269,
+      "operating_income": 249018306,
+      "net_income": 225484877,
+      "total_assets": 5797893082,
+      "total_liabilities": 3665714254,
+      "shareholders_equity": 2132178828,
+      "current_assets": 2499699578,
+      "current_liabilities": 1279174434,
+      "inventory": 320688526,
+      "operating_cash_flow": null,
+      "capital_expenditure": null,
+      "sources": {
+        "revenue": "營業收入淨額",
+        "gross_profit": "營業毛利",
+        "operating_income": "營業利益",
+        "net_income": "本期淨利歸屬於母公司業主",
+        "total_assets": "資產總計",
+        "total_liabilities": "負債總計",
+        "shareholders_equity": "權益總計",
+        "current_assets": "流動資產合計",
+        "current_liabilities": "流動負債合計",
+        "inventory": "存貨",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      },
+      "codes": {
+        "revenue": "4000",
+        "gross_profit": "5950",
+        "operating_income": "6900",
+        "net_income": "8610",
+        "total_assets": "1XXX",
+        "total_liabilities": "2XXX",
+        "shareholders_equity": "3XXX",
+        "current_assets": "11XX",
+        "current_liabilities": "21XX",
+        "inventory": "14XX",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      },
+      "evidence": {
+        "revenue": {
+          "column_header": "113年1月1日至3月31日",
+          "amount_text": "592,644,201",
+          "row_values_text": "4000 營業收入淨額(附註二十三、三一及三七) 839,253,664 100 592,644,201 100"
+        },
+        "gross_profit": {
+          "column_header": "113年1月1日至3月31日",
+          "amount_text": "314,505,269",
+          "row_values_text": "5950 營業毛利 493,395,076 59 314,505,269 53"
+        },
+        "operating_income": {
+          "column_header": "113年1月1日至3月31日",
+          "amount_text": "249,018,306",
+          "row_values_text": "6900 營業利益(附註三七) 407,080,808 49 249,018,306 42"
+        },
+        "net_income": {
+          "column_header": "113年1月1日至3月31日",
+          "amount_text": "225,484,877",
+          "row_values_text": "8610 母公司業主 361,564,124 43 225,484,877 38"
+        },
+        "total_assets": {
+          "column_header": "113年3月31日",
+          "amount_text": "5,797,893,082",
+          "row_values_text": "1XXX 資產總計 7,333,087,420 100 6,691,958,000 100 5,797,893,082 100"
+        },
+        "total_liabilities": {
+          "column_header": "113年3月31日",
+          "amount_text": "3,665,714,254",
+          "row_values_text": "2XXX 負債總計 4,323,020,846 64 3,988,482,883 64 3,665,714,254 63"
+        },
+        "shareholders_equity": {
+          "column_header": "113年3月31日",
+          "amount_text": "2,132,178,828",
+          "row_values_text": "3XXX 權益總計 3,010,066,574 45 2,703,475,117 44 2,132,178,828 37"
+        },
+        "current_assets": {
+          "column_header": "113年3月31日",
+          "amount_text": "2,499,699,578",
+          "row_values_text": "11XX 流動資產合計 3,333,420,539 42 2,873,810,480 43 2,499,699,578 43"
+        },
+        "current_liabilities": {
+          "column_header": "113年3月31日",
+          "amount_text": "1,279,174,434",
+          "row_values_text": "21XX 流動負債合計 1,973,882,750 29 1,720,414,904 28 1,279,174,434 22"
+        },
+        "inventory": {
+          "column_header": "113年3月31日",
+          "amount_text": "320,688,526",
+          "row_values_text": "14XX 存貨 (附註六) 300,772,972 4 287,848,810 4 320,688,526 5"
+        },
+        "operating_cash_flow": {
+          "column_header": null,
+          "amount_text": null,
+          "row_values_text": null
+        },
+        "capital_expenditure": {
+          "column_header": null,
+          "amount_text": null,
+          "row_values_text": null
+        }
+      }
+    }
+  ],
+  "warnings": []
+}
