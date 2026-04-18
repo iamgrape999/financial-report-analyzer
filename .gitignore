@@ -13,6 +13,8 @@ env/
 # Generated reports
 *_report.md
 financial_analysis_report.md
+financial_screenshot_report.md
+extracted_financials.csv
 
 # Local editor files
 .idea/
