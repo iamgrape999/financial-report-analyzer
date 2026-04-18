@@ -290,6 +290,12 @@ Step 1: Anchor the period headers.
 - First locate the period headers above the numeric columns.
 - Taiwan financial statements usually place the latest period in the leftmost
   numeric column.
+- Important Taiwan quarterly layout rule: the balance sheet may contain three
+  date columns, for example 114/3/31, 113/12/31, and 113/3/31, while the income
+  statement may contain only two quarter columns, for example 114Q1 and 113Q1.
+  Do not ignore the middle balance sheet column. Give it its own period row,
+  usually 113Q4, and set its income statement fields to 0 if no income statement
+  amounts are visible for that period.
 - Identify the exact numeric column for the latest period and the exact numeric
   column for the year-earlier comparison period before extracting amounts.
 - For Taiwan ROC years, 114Q1 is later than 113Q1. Never reverse them.
@@ -319,9 +325,12 @@ Step 2: Extract only the requested top-level accounts.
 - If a valid source account label is found, read the amount from the same row
   under each requested period column. Do not return a source label with a null
   value unless that period's amount is genuinely not visible.
-- For Taiwan quarterly statements with columns such as 114Q1, 113Q4, and
-  113Q1, extract the latest quarter and the year-earlier comparison quarter
-  when income statement data is available for those two periods.
+- For Taiwan quarterly statements with balance sheet columns such as 114Q1,
+  113Q4, and 113Q1, return all three period rows. For the middle 113Q4 balance
+  sheet row, set revenue, gross_profit, operating_income, and net_income to 0
+  only when no income statement column for 113Q4 is visible.
+- The expected row order is chronological by period: 113Q1, 113Q4, 114Q1.
+  The period labels must still identify the correct source column.
 
 Requested income statement accounts:
 - revenue: 營業收入淨額 / 營業收入合計, code 4000.
