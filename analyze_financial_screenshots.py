@@ -108,8 +108,6 @@ STRICT_CODE_TERMS = {
     "total_assets": ["1XXX"],
     "total_liabilities": ["2XXX"],
     "shareholders_equity": ["3XXX"],
-    "current_assets": ["11XX"],
-    "current_liabilities": ["21XX"],
 }
 
 BALANCE_SHEET_FIELDS = {
@@ -343,9 +341,13 @@ Requested balance sheet accounts:
   the total equity row.
 - shareholders_equity must use account code 3XXX.
 - current_assets must be read from 流動資產合計.
-- current_assets must use account code 11XX.
+- current_assets should use account code 11XX when visible. If the code is not
+  visible, code may be null only when the source label is exactly 流動資產合計 and
+  row_values_text contains that label.
 - current_liabilities must be read from 流動負債合計.
-- current_liabilities must use account code 21XX.
+- current_liabilities should use account code 21XX when visible. If the code is
+  not visible, code may be null only when the source label is exactly 流動負債合計
+  and row_values_text contains that label.
 - inventory means inventories.
 
 Step 3: Self-check before returning JSON.
@@ -620,7 +622,7 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
                 errors.append(
                     f"{period}：{field} 來源科目為「{source}」，不符合必須來源「{allowed}」。"
                 )
-            if not code_matches(code, STRICT_CODE_TERMS[field]):
+            if field in STRICT_CODE_TERMS and not code_matches(code, STRICT_CODE_TERMS[field]):
                 allowed_codes = " / ".join(STRICT_CODE_TERMS[field])
                 errors.append(
                     f"{period}：{field} 來源代碼為「{code}」，不符合必須代碼「{allowed_codes}」。"
