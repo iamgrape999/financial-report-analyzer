@@ -66,6 +66,35 @@ GEMINI_CODE_FIELD_SCHEMA = {
     column: {"type": "STRING", "nullable": True} for column in SOURCE_COLUMNS
 }
 
+EVIDENCE_FIELD_SCHEMA = {
+    column: {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "column_header": {"type": ["string", "null"]},
+            "amount_text": {"type": ["string", "null"]},
+            "row_values_text": {"type": ["string", "null"]},
+        },
+        "required": ["column_header", "amount_text", "row_values_text"],
+    }
+    for column in SOURCE_COLUMNS
+}
+
+GEMINI_EVIDENCE_VALUE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "column_header": {"type": "STRING", "nullable": True},
+        "amount_text": {"type": "STRING", "nullable": True},
+        "row_values_text": {"type": "STRING", "nullable": True},
+    },
+    "required": ["column_header", "amount_text", "row_values_text"],
+    "propertyOrdering": ["column_header", "amount_text", "row_values_text"],
+}
+
+GEMINI_EVIDENCE_FIELD_SCHEMA = {
+    column: GEMINI_EVIDENCE_VALUE_SCHEMA for column in SOURCE_COLUMNS
+}
+
 STRICT_SOURCE_TERMS = {
     "total_assets": ["資產總計", "資產總額", "資產合計"],
     "total_liabilities": ["負債總計", "負債總額", "負債合計"],
@@ -125,8 +154,14 @@ EXTRACTION_SCHEMA = {
                         "properties": CODE_FIELD_SCHEMA,
                         "required": SOURCE_COLUMNS,
                     },
+                    "evidence": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": EVIDENCE_FIELD_SCHEMA,
+                        "required": SOURCE_COLUMNS,
+                    },
                 },
-                "required": OUTPUT_COLUMNS + ["sources", "codes"],
+                "required": OUTPUT_COLUMNS + ["sources", "codes", "evidence"],
             },
         },
         "warnings": {"type": "array", "items": {"type": "string"}},
@@ -169,9 +204,15 @@ GEMINI_RESPONSE_SCHEMA = {
                         "required": SOURCE_COLUMNS,
                         "propertyOrdering": SOURCE_COLUMNS,
                     },
+                    "evidence": {
+                        "type": "OBJECT",
+                        "properties": GEMINI_EVIDENCE_FIELD_SCHEMA,
+                        "required": SOURCE_COLUMNS,
+                        "propertyOrdering": SOURCE_COLUMNS,
+                    },
                 },
-                "required": OUTPUT_COLUMNS + ["sources", "codes"],
-                "propertyOrdering": OUTPUT_COLUMNS + ["sources", "codes"],
+                "required": OUTPUT_COLUMNS + ["sources", "codes", "evidence"],
+                "propertyOrdering": OUTPUT_COLUMNS + ["sources", "codes", "evidence"],
             },
         },
         "warnings": {"type": "ARRAY", "items": {"type": "STRING"}},
@@ -254,6 +295,12 @@ Step 2: Extract only the requested top-level accounts.
 - Also return the exact account code shown at the left of that same source row
   in codes, such as 1XXX, 11XX, 2XXX, 21XX, or 3XXX. If no code is visible, set
   the code to null.
+- For every field, return evidence:
+  column_header: the exact period header above the chosen amount.
+  amount_text: the exact visible amount text copied from the chosen cell.
+  row_values_text: the full visible numeric row for that source account, left
+  to right, including all period columns. This is required so Python and humans
+  can audit column alignment.
 - If a valid source account label is found, read the amount from the same row
   under each requested period column. Do not return a source label with a null
   value unless that period's amount is genuinely not visible.
@@ -430,6 +477,34 @@ def normalize_source(source: Any) -> str:
     return str(source).replace(" ", "").replace("　", "").strip()
 
 
+def normalize_amount_text(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value)
+    return (
+        text.replace(",", "")
+        .replace("$", "")
+        .replace("(", "-")
+        .replace(")", "")
+        .replace(" ", "")
+        .replace("　", "")
+        .strip()
+    )
+
+
+def value_matches_amount_text(value: Any, amount_text: Any) -> bool:
+    if value is None:
+        return amount_text in {None, ""}
+    normalized = normalize_amount_text(amount_text)
+    if not normalized:
+        return False
+    try:
+        text_number = float(normalized)
+        return abs(float(value) - text_number) <= max(1.0, abs(text_number) * 0.000001)
+    except ValueError:
+        return str(int(value)) in normalized if isinstance(value, (int, float)) else False
+
+
 def source_matches(source: Any, allowed_terms: list[str]) -> bool:
     normalized = normalize_source(source)
     return any(term.replace(" ", "") in normalized for term in allowed_terms)
@@ -448,11 +523,16 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
         period = row.get("period", "unknown period")
         sources = row.get("sources") or {}
         codes = row.get("codes") or {}
+        evidence = row.get("evidence") or {}
 
         for field, allowed_terms in STRICT_SOURCE_TERMS.items():
             value = row.get(field)
             source = sources.get(field)
             code = codes.get(field)
+            field_evidence = evidence.get(field) or {}
+            amount_text = field_evidence.get("amount_text")
+            column_header = field_evidence.get("column_header")
+            row_values_text = field_evidence.get("row_values_text")
             if value is None:
                 if source:
                     errors.append(
@@ -471,6 +551,18 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
                 allowed_codes = " / ".join(STRICT_CODE_TERMS[field])
                 errors.append(
                     f"{period}：{field} 來源代碼為「{code}」，不符合必須代碼「{allowed_codes}」。"
+                )
+            if not column_header or str(period).replace(" ", "") not in str(column_header).replace(" ", ""):
+                errors.append(
+                    f"{period}：{field} 的欄位表頭證據為「{column_header}」，未明確對應期間「{period}」。"
+                )
+            if not value_matches_amount_text(value, amount_text):
+                errors.append(
+                    f"{period}：{field} 數值 {value} 與原始儲存格文字「{amount_text}」不一致。"
+                )
+            if not row_values_text or normalize_amount_text(amount_text) not in normalize_amount_text(row_values_text):
+                errors.append(
+                    f"{period}：{field} 的完整列證據未包含儲存格金額「{amount_text}」。"
                 )
 
         equity_source = normalize_source(sources.get("shareholders_equity"))
@@ -502,6 +594,7 @@ def write_sources(extraction: dict[str, Any], output_json: Path) -> None:
                 "period": row.get("period"),
                 "sources": row.get("sources") or {},
                 "codes": row.get("codes") or {},
+                "evidence": row.get("evidence") or {},
             }
         )
     output_json.write_text(
