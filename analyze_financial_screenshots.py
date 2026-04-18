@@ -2,9 +2,9 @@
 """
 Analyze financial statement screenshots.
 
-This script sends one or more financial report screenshots to the OpenAI
-Responses API, extracts the fields required by financial_report_analyzer.py,
-writes a normalized CSV file, then generates the Markdown analysis report.
+This script sends one or more financial report screenshots to a vision-capable
+AI API, extracts the fields required by financial_report_analyzer.py, writes a
+normalized CSV file, then generates the Markdown analysis report.
 """
 
 from __future__ import annotations
@@ -22,8 +22,10 @@ from typing import Any, Iterable, Optional
 
 from financial_report_analyzer import (
     REQUIRED_COLUMNS,
+    audit_rows,
     calculate_metrics,
     load_csv,
+    period_sort_key,
     render_report,
 )
 
@@ -72,6 +74,40 @@ EXTRACTION_SCHEMA = {
     "required": ["company", "currency_unit", "periods", "warnings"],
 }
 
+GEMINI_RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "company": {"type": "STRING", "nullable": True},
+        "currency_unit": {"type": "STRING", "nullable": True},
+        "periods": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "period": {"type": "STRING"},
+                    "revenue": {"type": "NUMBER", "nullable": True},
+                    "gross_profit": {"type": "NUMBER", "nullable": True},
+                    "operating_income": {"type": "NUMBER", "nullable": True},
+                    "net_income": {"type": "NUMBER", "nullable": True},
+                    "total_assets": {"type": "NUMBER", "nullable": True},
+                    "total_liabilities": {"type": "NUMBER", "nullable": True},
+                    "shareholders_equity": {"type": "NUMBER", "nullable": True},
+                    "current_assets": {"type": "NUMBER", "nullable": True},
+                    "current_liabilities": {"type": "NUMBER", "nullable": True},
+                    "inventory": {"type": "NUMBER", "nullable": True},
+                    "operating_cash_flow": {"type": "NUMBER", "nullable": True},
+                    "capital_expenditure": {"type": "NUMBER", "nullable": True},
+                },
+                "required": OUTPUT_COLUMNS,
+                "propertyOrdering": OUTPUT_COLUMNS,
+            },
+        },
+        "warnings": {"type": "ARRAY", "items": {"type": "STRING"}},
+    },
+    "required": ["company", "currency_unit", "periods", "warnings"],
+    "propertyOrdering": ["company", "currency_unit", "periods", "warnings"],
+}
+
 
 def find_images(paths: Iterable[Path]) -> list[Path]:
     images: list[Path] = []
@@ -101,6 +137,14 @@ def image_to_data_url(path: Path) -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
+def image_to_inline_data(path: Path) -> dict[str, str]:
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if not mime_type:
+        mime_type = "image/png"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return {"mime_type": mime_type, "data": encoded}
+
+
 def build_prompt(company: Optional[str]) -> str:
     company_hint = company or "the company shown in the screenshots"
     return f"""
@@ -114,6 +158,7 @@ Return only the JSON object required by the schema.
 Extraction rules:
 - Extract one row per comparable period.
 - Use the period label shown in the statement, such as 2025Q1 or 114Q1.
+- For Taiwan ROC years, 114Q1 is later than 113Q1. Do not reverse them.
 - Convert parenthesized amounts to negative numbers.
 - Preserve the statement unit. If the report says amounts are in thousands,
   return the numbers exactly as shown in that unit and set currency_unit.
@@ -123,12 +168,19 @@ Extraction rules:
 - operating_income means operating income.
 - net_income means net income attributable to owners of the parent when shown;
   otherwise use net income.
-- total_assets means assets total.
-- total_liabilities means liabilities total.
-- shareholders_equity means equity total.
-- current_assets means current assets total.
-- current_liabilities means current liabilities total.
+- total_assets must be read from the explicit row 資產總計 / 資產總額.
+  Never infer it from liabilities plus equity.
+- total_liabilities must be read from the explicit row 負債總計 / 負債總額.
+- shareholders_equity must be read from the explicit row 權益總計 / 權益總額.
+  Do not use 股本, 保留盈餘, or 母公司業主權益 unless it is clearly the total equity row.
+- current_assets must be read from 流動資產合計.
+- current_liabilities must be read from 流動負債合計.
 - inventory means inventories.
+- After extraction, verify:
+  total_assets approximately equals total_liabilities + shareholders_equity.
+  current_assets is not greater than total_assets.
+  current_liabilities is not greater than total_liabilities.
+  If any check fails, set the uncertain field to null and add a warning.
 - operating_cash_flow and capital_expenditure are usually not on balance sheet
   or income statement screenshots; use null unless a cash flow statement is
   visible.
@@ -186,6 +238,45 @@ def call_openai(images: list[Path], company: Optional[str], model: str) -> dict[
     return json.loads(output_text)
 
 
+def call_gemini(images: list[Path], company: Optional[str], model: str) -> dict[str, Any]:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Please set GEMINI_API_KEY before running screenshot analysis.")
+
+    parts: list[dict[str, Any]] = [{"text": build_prompt(company)}]
+    for image in images:
+        parts.append({"inline_data": image_to_inline_data(image)})
+
+    payload = {
+        "contents": [{"role": "user", "parts": parts}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": GEMINI_RESPONSE_SCHEMA,
+        },
+    }
+
+    request = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=180) as response:
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Gemini API error {exc.code}: {details}") from exc
+
+    data = json.loads(raw)
+    output_text = extract_gemini_text(data)
+    return json.loads(output_text)
+
+
 def extract_output_text(response: dict[str, Any]) -> str:
     if isinstance(response.get("output_text"), str):
         return response["output_text"]
@@ -201,6 +292,17 @@ def extract_output_text(response: dict[str, Any]) -> str:
     return "".join(chunks)
 
 
+def extract_gemini_text(response: dict[str, Any]) -> str:
+    candidates = response.get("candidates", [])
+    for candidate in candidates:
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            text = part.get("text")
+            if isinstance(text, str):
+                return text
+    raise RuntimeError("Gemini response did not contain output text.")
+
+
 def format_csv_value(value: Any) -> str:
     if value is None:
         return ""
@@ -214,6 +316,8 @@ def write_csv(extraction: dict[str, Any], output_csv: Path) -> None:
     if len(periods) < 2:
         raise ValueError("At least two extracted periods are required for trend analysis.")
 
+    periods = sorted(periods, key=lambda row: period_sort_key(str(row.get("period", ""))))
+
     with output_csv.open("w", encoding="utf-8-sig", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=OUTPUT_COLUMNS)
         writer.writeheader()
@@ -226,9 +330,15 @@ def main() -> int:
     parser.add_argument("images", nargs="+", type=Path, help="Image files or directories.")
     parser.add_argument("-c", "--company", help="Company name for the report.")
     parser.add_argument(
+        "--provider",
+        choices=["gemini", "openai"],
+        default=os.environ.get("FINANCIAL_IMAGE_PROVIDER", "gemini"),
+        help="AI provider to use for screenshot extraction.",
+    )
+    parser.add_argument(
         "--model",
-        default=os.environ.get("FINANCIAL_IMAGE_MODEL", "gpt-4.1-mini"),
-        help="OpenAI vision-capable model to use.",
+        default=os.environ.get("FINANCIAL_IMAGE_MODEL"),
+        help="Vision-capable model to use. Defaults to gemini-2.5-flash for Gemini or gpt-4.1-mini for OpenAI.",
     )
     parser.add_argument(
         "--csv-output",
@@ -243,16 +353,33 @@ def main() -> int:
         default=Path("financial_screenshot_report.md"),
         help="Where to save the Markdown analysis report.",
     )
+    parser.add_argument(
+        "--fail-on-audit-warning",
+        action="store_true",
+        help="Exit with an error after writing outputs if data-quality audit warnings are found.",
+    )
     args = parser.parse_args()
 
     images = find_images(args.images)
-    extraction = call_openai(images, args.company, args.model)
+    model = args.model
+    if not model:
+        model = "gemini-2.5-flash" if args.provider == "gemini" else "gpt-4.1-mini"
+
+    if args.provider == "gemini":
+        extraction = call_gemini(images, args.company, model)
+    else:
+        extraction = call_openai(images, args.company, model)
     write_csv(extraction, args.csv_output)
 
     company = args.company or extraction.get("company") or "Company"
     rows = load_csv(args.csv_output)
     metrics = calculate_metrics(rows)
     report = render_report(company, metrics, args.csv_output)
+
+    audit_warnings = audit_rows(rows)
+    if audit_warnings:
+        audit_lines = "\n".join(f"- {warning}" for warning in audit_warnings)
+        report += "\n## 資料品質警示\n\n" + audit_lines + "\n"
 
     warnings = extraction.get("warnings") or []
     if warnings:
@@ -262,6 +389,10 @@ def main() -> int:
     args.output.write_text(report, encoding="utf-8-sig")
     print(f"Wrote extracted data to {args.csv_output}")
     print(f"Wrote report to {args.output}")
+    if audit_warnings and args.fail_on_audit_warning:
+        raise RuntimeError(
+            "Data-quality audit warnings were found. Review the report before uploading."
+        )
     return 0
 
 
