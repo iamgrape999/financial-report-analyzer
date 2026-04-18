@@ -1,10 +1,10 @@
 # 財報自動分析程式 Financial Report Analyzer
 
-這是一個零第三方依賴的 Python 財報分析工具。它讀取多期財務資料 CSV，計算常見財務比率、趨勢與風險旗標，並輸出 Markdown 分析報告。
+這是一個財報分析工具。它可以讀取多期財務資料 CSV，也可以讀取財報截圖，計算常見財務比率、趨勢與風險旗標，並輸出 Markdown 分析報告。
 
 適合用來快速檢查公司多年財報趨勢，例如營收成長、毛利率、淨利率、ROE、流動比率、負債權益比與自由現金流。
 
-## 快速開始
+## CSV 快速開始
 
 如果你的電腦已經安裝 Python：
 
@@ -29,6 +29,61 @@ period,revenue,gross_profit,operating_income,net_income,total_assets,total_liabi
 ```
 
 金額可使用純數字或逗號格式，負數可用 `-1000` 或 `(1000)`。
+
+## 財報截圖分析
+
+如果你有財報截圖，例如資產負債表與損益表的 PNG/JPG，可以使用：
+
+```powershell
+$env:OPENAI_API_KEY = "你的 OpenAI API key"
+python .\analyze_financial_screenshots.py .\balance_sheet.png .\income_statement_1.png .\income_statement_2.png -c "公司名稱" -o .\screenshot_report.md
+```
+
+如果截圖放在同一個資料夾，例如 `screenshots`：
+
+```powershell
+$env:OPENAI_API_KEY = "你的 OpenAI API key"
+python .\analyze_financial_screenshots.py .\screenshots -c "公司名稱" -o .\screenshot_report.md
+```
+
+程式會產生兩個檔案：
+
+- `extracted_financials.csv`：從截圖辨識出的標準化財報資料
+- `screenshot_report.md`：財務比率與趨勢分析報告
+
+截圖分析使用 OpenAI 視覺模型。API key 請只放在本機環境變數，不要寫進檔案，也不要上傳到 GitHub。
+
+截圖至少需要包含兩個可比較期間。若只提供資產負債表與損益表，現金流相關指標會顯示 `N/A`，這是正常情況。
+
+## 一鍵分析並上傳到 GitHub
+
+如果你想把「截圖分析」與「上傳 GitHub」合併成一段指令，可以使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -Images ".\screenshots" -Company "公司名稱"
+```
+
+如果尚未設定 `OPENAI_API_KEY` 或 `GITHUB_TOKEN`，腳本會提示你輸入，輸入時不會顯示在畫面上。
+
+這會自動完成：
+
+- 讀取截圖
+- 產生 `extracted_financials.csv`
+- 產生 `screenshot_report.md`
+- 上傳到 GitHub 的 `reports/<時間>-<公司名稱>/` 資料夾
+
+預設只上傳分析結果，不上傳原始截圖。若你也要把原始圖片放到 GitHub：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -Images ".\screenshots" -Company "公司名稱" -UploadImages
+```
+
+若你是用環境變數方式執行，完成後請清掉本機環境變數：
+
+```powershell
+Remove-Item Env:\OPENAI_API_KEY
+Remove-Item Env:\GITHUB_TOKEN
+```
 
 ## 目前會分析的項目
 
