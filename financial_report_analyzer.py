@@ -214,9 +214,18 @@ def load_csv(path: Path) -> list[PeriodData]:
 
 def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
     metrics = []
-    previous: Optional[PeriodData] = None
+    previous_income_row: Optional[PeriodData] = None
 
     for row in rows:
+        has_income_statement_data = any(
+            value != 0
+            for value in (
+                row.revenue,
+                row.gross_profit,
+                row.operating_income,
+                row.net_income,
+            )
+        )
         metrics.append(
             MetricRow(
                 period=row.period,
@@ -243,19 +252,20 @@ def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
                     else None
                 ),
                 revenue_growth=(
-                    growth_rate(row.revenue, previous.revenue)
-                    if previous
+                    growth_rate(row.revenue, previous_income_row.revenue)
+                    if has_income_statement_data and previous_income_row
                     else None
                 ),
                 net_income_growth=(
-                    growth_rate(row.net_income, previous.net_income)
-                    if previous
+                    growth_rate(row.net_income, previous_income_row.net_income)
+                    if has_income_statement_data and previous_income_row
                     else None
                 ),
                 period_basis=period_basis(row.period),
             )
         )
-        previous = row
+        if has_income_statement_data:
+            previous_income_row = row
 
     return metrics
 
