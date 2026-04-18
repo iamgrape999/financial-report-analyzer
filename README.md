@@ -130,6 +130,27 @@ Remove-Item Env:\GEMINI_API_KEY
 Remove-Item Env:\GITHUB_TOKEN
 ```
 
+## 瀏覽器 UI
+
+本專案也提供 GitHub Pages 版本，檔案位於 `docs/`。
+
+部署後可以直接在瀏覽器中：
+
+- 輸入 Gemini API key
+- 選擇財報截圖
+- 產生 Markdown 報告
+- 下載 CSV / JSON / Markdown
+
+GitHub Pages 是靜態網站，不能安全保存 API key。此版本會要求使用者在頁面中輸入 Gemini API key，key 只用於當次瀏覽器請求，不會寫入 repository。
+
+若要啟用 GitHub Pages：
+
+1. 上傳本專案到 GitHub。
+2. 到 repository 的 `Settings`。
+3. 進入 `Pages`。
+4. Source 選擇 `GitHub Actions`。
+5. 推送後等待 `Deploy Pages` workflow 完成。
+
 ## 目前會分析的項目
 
 - 營收成長率
