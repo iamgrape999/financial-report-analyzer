@@ -220,21 +220,33 @@ def image_to_inline_data(path: Path) -> dict[str, str]:
 def build_prompt(company: Optional[str]) -> str:
     company_hint = company or "the company shown in the screenshots"
     return f"""
-You are extracting financial statement data for {company_hint}.
+You are a strict accounting data extraction system for {company_hint}.
 
 Read the screenshots carefully. They may be Traditional Chinese financial
 statements containing balance sheet and income statement pages.
 
 Return only the JSON object required by the schema.
 
-Extraction rules:
+Do not invent, infer, calculate, or repair missing financial statement numbers.
+Only copy numbers that are visible in the screenshots.
+
+Step 1: Anchor the period headers.
+- First locate the period headers above the numeric columns.
+- Taiwan financial statements usually place the latest period in the leftmost
+  numeric column.
+- Identify the exact numeric column for the latest period and the exact numeric
+  column for the year-earlier comparison period before extracting amounts.
+- For Taiwan ROC years, 114Q1 is later than 113Q1. Never reverse them.
+- The amount must come from the intersection of the same account row and the
+  selected period column. Do not visually jump to nearby rows or columns.
+
+Step 2: Extract only the requested top-level accounts.
 - Extract one row per comparable period.
 - Use the period label shown in the statement, such as 2025Q1 or 114Q1.
-- For Taiwan ROC years, 114Q1 is later than 113Q1. Do not reverse them.
 - Convert parenthesized amounts to negative numbers.
 - Preserve the statement unit. If the report says amounts are in thousands,
   return the numbers exactly as shown in that unit and set currency_unit.
-- Use null when a field is not visible in the screenshots.
+- Use null when a field amount is not visible in the screenshots.
 - For every numeric field, return its exact source account label in sources.
   Example: total_assets sources must be 資產總計, not a nearby subtotal.
   If you cannot point to a specific account label, set the value to null and
@@ -248,29 +260,40 @@ Extraction rules:
 - For Taiwan quarterly statements with columns such as 114Q1, 113Q4, and
   113Q1, extract the latest quarter and the year-earlier comparison quarter
   when income statement data is available for those two periods.
-- revenue means operating revenue.
-- gross_profit means gross profit.
-- operating_income means operating income.
-- net_income means net income attributable to owners of the parent when shown;
-  otherwise use net income.
+
+Requested income statement accounts:
+- revenue: 營業收入淨額 / 營業收入合計, code 4000.
+- gross_profit: 營業毛利 / 營業毛利淨額, code 5950.
+- operating_income: 營業利益 / 營業淨利, code 6900.
+- net_income: 本期淨利歸屬於母公司業主, code 8610.
+
+Requested balance sheet accounts:
 - total_assets must be read from the explicit row 資產總計 / 資產總額.
   Never infer it from liabilities plus equity.
 - total_assets must use account code 1XXX.
 - total_liabilities must be read from the explicit row 負債總計 / 負債總額.
 - total_liabilities must use account code 2XXX.
 - shareholders_equity must be read from the explicit row 權益總計 / 權益總額.
-  Do not use 股本, 保留盈餘, or 母公司業主權益 unless it is clearly the total equity row.
+  Use total equity because downstream checks require 資產總計 = 負債總計 + 權益總計.
+  Do not use 股本, 保留盈餘, 母公司業主權益, or 非控制權益 unless the row is clearly
+  the total equity row.
 - shareholders_equity must use account code 3XXX.
 - current_assets must be read from 流動資產合計.
 - current_assets must use account code 11XX.
 - current_liabilities must be read from 流動負債合計.
 - current_liabilities must use account code 21XX.
 - inventory means inventories.
-- After extraction, verify:
+
+Step 3: Self-check before returning JSON.
+- Verify the selected period columns are not swapped.
+- Verify the source account label and account code are from the same row as the
+  amount.
+- Verify:
   total_assets approximately equals total_liabilities + shareholders_equity.
   current_assets is not greater than total_assets.
   current_liabilities is not greater than total_liabilities.
-  If any check fails, set the uncertain field to null and add a warning.
+- If any check fails, do not make the equation work by inventing a number.
+  Keep the copied value, add a warning, and let the downstream validator decide.
 - operating_cash_flow and capital_expenditure are usually not on balance sheet
   or income statement screenshots; use null unless a cash flow statement is
   visible.
