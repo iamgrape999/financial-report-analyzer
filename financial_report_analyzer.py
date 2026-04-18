@@ -48,6 +48,7 @@ class PeriodData:
     inventory: float
     operating_cash_flow: Optional[float] = None
     capital_expenditure: Optional[float] = None
+    was_reordered: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,20 +97,44 @@ def safe_divide(numerator: float, denominator: float) -> Optional[float]:
     return None
 
 
+def growth_rate(current: float, previous: float) -> Optional[float]:
+    if previous == 0:
+        return None
+    if previous < 0:
+        return None
+    return safe_divide(current - previous, abs(previous))
+
+
 def period_sort_key(period: str) -> tuple[int, int, str]:
     text = period.strip()
     compact = text.upper().replace(" ", "")
 
-    quarter_match = re.search(r"(\d{2,4})\D*Q([1-4])", compact)
-    if not quarter_match:
-        quarter_match = re.search(r"(\d{2,4})\D*第?([1-4])季", text)
+    year = 0
+    quarter = 0
 
-    year_match = re.search(r"(\d{2,4})", compact)
-    year = int(year_match.group(1)) if year_match else 0
+    year_first = re.search(r"(\d{2,4})\D*Q([1-4])", text, re.IGNORECASE)
+    quarter_first = re.search(r"Q([1-4])\D*(\d{2,4})", text, re.IGNORECASE)
+    chinese_quarter = re.search(r"(\d{2,4})\D*第?([1-4])季", text)
+
+    if year_first:
+        year = int(year_first.group(1))
+        quarter = int(year_first.group(2))
+    elif quarter_first:
+        quarter = int(quarter_first.group(1))
+        year = int(quarter_first.group(2))
+    elif chinese_quarter:
+        year = int(chinese_quarter.group(1))
+        quarter = int(chinese_quarter.group(2))
+    else:
+        quarter_match = re.search(r"Q([1-4])", compact)
+        if not quarter_match:
+            quarter_match = re.search(r"第?([1-4])季", text)
+        year_match = re.search(r"(\d{2,4})", compact)
+        year = int(year_match.group(1)) if year_match else 0
+        quarter = int(quarter_match.group(1)) if quarter_match else 0
+
     if 1 <= year < 1911:
         year += 1911
-
-    quarter = int(quarter_match.group(2)) if quarter_match else 0
     return (year, quarter, text)
 
 
@@ -161,7 +186,30 @@ def load_csv(path: Path) -> list[PeriodData]:
     if len(rows) < 2:
         raise ValueError("At least two periods are required for trend analysis.")
 
-    return sorted(rows, key=lambda row: period_sort_key(row.period))
+    sorted_rows = sorted(rows, key=lambda row: period_sort_key(row.period))
+    was_reordered = [row.period for row in rows] != [row.period for row in sorted_rows]
+    if was_reordered:
+        sorted_rows = [
+            PeriodData(
+                period=row.period,
+                revenue=row.revenue,
+                gross_profit=row.gross_profit,
+                operating_income=row.operating_income,
+                net_income=row.net_income,
+                total_assets=row.total_assets,
+                total_liabilities=row.total_liabilities,
+                shareholders_equity=row.shareholders_equity,
+                current_assets=row.current_assets,
+                current_liabilities=row.current_liabilities,
+                inventory=row.inventory,
+                operating_cash_flow=row.operating_cash_flow,
+                capital_expenditure=row.capital_expenditure,
+                was_reordered=True,
+            )
+            for row in sorted_rows
+        ]
+
+    return sorted_rows
 
 
 def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
@@ -195,12 +243,12 @@ def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
                     else None
                 ),
                 revenue_growth=(
-                    safe_divide(row.revenue - previous.revenue, previous.revenue)
+                    growth_rate(row.revenue, previous.revenue)
                     if previous
                     else None
                 ),
                 net_income_growth=(
-                    safe_divide(row.net_income - previous.net_income, previous.net_income)
+                    growth_rate(row.net_income, previous.net_income)
                     if previous
                     else None
                 ),
@@ -324,9 +372,7 @@ def audit_rows(rows: list[PeriodData]) -> list[str]:
                 "請以原始資產負債表覆核。"
             )
 
-    sorted_periods = [row.period for row in sorted(rows, key=lambda item: period_sort_key(item.period))]
-    input_periods = [row.period for row in rows]
-    if input_periods != sorted_periods:
+    if any(row.was_reordered for row in rows):
         warnings.append(
             "輸入期間已依年份與季度重新排序，避免把舊期間誤判為最新期間。"
         )
