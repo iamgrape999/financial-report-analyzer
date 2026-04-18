@@ -22,3 +22,6 @@ jobs:
 
       - name: Verify report output
         run: test -s sample_report.md
+
+      - name: Check screenshot analyzer syntax
+        run: python analyze_financial_screenshots.py --help
