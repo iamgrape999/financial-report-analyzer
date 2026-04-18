@@ -211,6 +211,12 @@ Extraction rules:
   Example: total_assets sources must be 資產總計, not a nearby subtotal.
   If you cannot point to a specific account label, set the value to null and
   the source to null.
+- If a valid source account label is found, read the amount from the same row
+  under each requested period column. Do not return a source label with a null
+  value unless that period's amount is genuinely not visible.
+- For Taiwan quarterly statements with columns such as 114Q1, 113Q4, and
+  113Q1, extract the latest quarter and the year-earlier comparison quarter
+  when income statement data is available for those two periods.
 - revenue means operating revenue.
 - gross_profit means gross profit.
 - operating_income means operating income.
@@ -382,7 +388,13 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
             value = row.get(field)
             source = sources.get(field)
             if value is None:
-                errors.append(f"{period}：{field} 缺值，必須由明確會計科目萃取。")
+                if source:
+                    errors.append(
+                        f"{period}：{field} 來源科目為「{source}」，但數值缺失；"
+                        "請回查截圖該科目在此期間的金額是否清楚可讀。"
+                    )
+                else:
+                    errors.append(f"{period}：{field} 缺值，必須由明確會計科目萃取。")
                 continue
             if not source_matches(source, allowed_terms):
                 allowed = " / ".join(allowed_terms)
@@ -422,6 +434,13 @@ def write_sources(extraction: dict[str, Any], output_json: Path) -> None:
         )
     output_json.write_text(
         json.dumps(source_rows, ensure_ascii=False, indent=2),
+        encoding="utf-8-sig",
+    )
+
+
+def write_raw_extraction(extraction: dict[str, Any], output_json: Path) -> None:
+    output_json.write_text(
+        json.dumps(extraction, ensure_ascii=False, indent=2),
         encoding="utf-8-sig",
     )
 
@@ -468,6 +487,12 @@ def main() -> int:
         help="Where to save source account labels for extracted fields.",
     )
     parser.add_argument(
+        "--raw-output",
+        type=Path,
+        default=Path("extracted_raw.json"),
+        help="Where to save the full raw structured extraction.",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=Path,
@@ -491,6 +516,7 @@ def main() -> int:
     else:
         extraction = call_openai(images, args.company, model)
 
+    write_raw_extraction(extraction, args.raw_output)
     source_errors = validate_sources(extraction)
     write_sources(extraction, args.sources_output)
     if source_errors:
@@ -501,6 +527,7 @@ def main() -> int:
             f"{error_report}\n",
             encoding="utf-8-sig",
         )
+        print(f"Wrote raw extraction to {args.raw_output}")
         print(f"Wrote source labels to {args.sources_output}")
         print(f"Wrote validation failure report to {args.output}")
         raise RuntimeError(
