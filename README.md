@@ -35,14 +35,14 @@ period,revenue,gross_profit,operating_income,net_income,total_assets,total_liabi
 如果你有財報截圖，例如資產負債表與損益表的 PNG/JPG，可以使用：
 
 ```powershell
-$env:OPENAI_API_KEY = "你的 OpenAI API key"
+$env:GEMINI_API_KEY = "你的 Gemini API key"
 python .\analyze_financial_screenshots.py .\balance_sheet.png .\income_statement_1.png .\income_statement_2.png -c "公司名稱" -o .\screenshot_report.md
 ```
 
 如果截圖放在同一個資料夾，例如 `screenshots`：
 
 ```powershell
-$env:OPENAI_API_KEY = "你的 OpenAI API key"
+$env:GEMINI_API_KEY = "你的 Gemini API key"
 python .\analyze_financial_screenshots.py .\screenshots -c "公司名稱" -o .\screenshot_report.md
 ```
 
@@ -51,7 +51,7 @@ python .\analyze_financial_screenshots.py .\screenshots -c "公司名稱" -o .\s
 - `extracted_financials.csv`：從截圖辨識出的標準化財報資料
 - `screenshot_report.md`：財務比率與趨勢分析報告
 
-截圖分析使用 OpenAI 視覺模型。API key 請只放在本機環境變數，不要寫進檔案，也不要上傳到 GitHub。
+截圖分析預設使用 Gemini 視覺模型。API key 請只放在本機環境變數，不要寫進檔案，也不要上傳到 GitHub。
 
 截圖至少需要包含兩個可比較期間。若只提供資產負債表與損益表，現金流相關指標會顯示 `N/A`，這是正常情況。
 
@@ -63,7 +63,7 @@ python .\analyze_financial_screenshots.py .\screenshots -c "公司名稱" -o .\s
 powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -Images ".\screenshots" -Company "公司名稱"
 ```
 
-如果尚未設定 `OPENAI_API_KEY` 或 `GITHUB_TOKEN`，腳本會提示你輸入，輸入時不會顯示在畫面上。
+如果尚未設定 `GEMINI_API_KEY` 或 `GITHUB_TOKEN`，腳本會提示你輸入，輸入時不會顯示在畫面上。
 
 這會自動完成：
 
@@ -71,6 +71,14 @@ powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -I
 - 產生 `extracted_financials.csv`
 - 產生 `screenshot_report.md`
 - 上傳到 GitHub 的 `reports/<時間>-<公司名稱>/` 資料夾
+
+一鍵腳本預設採嚴格模式。如果程式偵測到時序、資產負債表小計、或可疑比率問題，會先產生本機報告但停止上傳，請人工覆核 `資料品質警示` 後再決定是否上傳。
+
+若你已人工確認警示可接受，可關閉嚴格模式：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -Images ".\screenshots" -Company "公司名稱" -RequireCleanAudit:$false
+```
 
 預設只上傳分析結果，不上傳原始截圖。若你也要把原始圖片放到 GitHub：
 
@@ -81,7 +89,7 @@ powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -I
 若你是用環境變數方式執行，完成後請清掉本機環境變數：
 
 ```powershell
-Remove-Item Env:\OPENAI_API_KEY
+Remove-Item Env:\GEMINI_API_KEY
 Remove-Item Env:\GITHUB_TOKEN
 ```
 
