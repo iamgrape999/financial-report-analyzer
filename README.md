@@ -55,6 +55,24 @@ python .\analyze_financial_screenshots.py .\screenshots -c "公司名稱" -o .\s
 
 截圖至少需要包含兩個可比較期間。若只提供資產負債表與損益表，現金流相關指標會顯示 `N/A`，這是正常情況。
 
+## 圖片萃取模型與 Prompt
+
+截圖轉資料的上游流程在 `analyze_financial_screenshots.py`：
+
+- 預設 provider：Gemini
+- 預設模型：`gemini-2.5-flash`
+- 可切換 provider：`--provider gemini` 或 `--provider openai`
+- 可切換模型：`--model <model-name>`
+- Prompt 位置：`build_prompt()` 函式
+
+目前 prompt 要求模型同時回傳：
+
+- 財報數字
+- 每個欄位的來源會計科目
+- 每個欄位的會計科目代碼
+
+核心資產負債表欄位會強制驗證來源科目與代碼，例如 `資產總計` 必須搭配 `1XXX`，`負債總計` 必須搭配 `2XXX`，`權益總計` 必須搭配 `3XXX`。若驗證失敗，程式會產生本機失敗報告並停止上傳 GitHub。
+
 ## 一鍵分析並上傳到 GitHub
 
 如果你想把「截圖分析」與「上傳 GitHub」合併成一段指令，可以使用：
