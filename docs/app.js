@@ -165,20 +165,34 @@ async function callGemini(apiKey, model, company, files) {
     },
   };
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify(payload),
-    },
-  );
+  const endpoint = apiKey
+    ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
+    : "./api/gemini";
+
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-goog-api-key"] = apiKey;
+  }
+
+  const body = apiKey
+    ? JSON.stringify(payload)
+    : JSON.stringify({
+        model,
+        contents: payload.contents,
+        generationConfig: payload.generationConfig,
+      });
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body,
+  });
 
   const text = await response.text();
   if (!response.ok) {
+    if (!apiKey && response.status === 404) {
+      throw new Error("找不到 Cloudflare API proxy。若仍使用 GitHub Pages，請輸入 Gemini API key；若使用 Cloudflare Pages，請確認 functions/api/gemini.js 已部署。");
+    }
     throw new Error(`Gemini API ${response.status}: ${text}`);
   }
 
