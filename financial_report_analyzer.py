@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
@@ -65,6 +66,7 @@ class MetricRow:
     free_cash_flow: Optional[float]
     revenue_growth: Optional[float]
     net_income_growth: Optional[float]
+    period_basis: str
 
 
 def parse_money(value: str) -> float:
@@ -92,6 +94,30 @@ def safe_divide(numerator: float, denominator: float) -> Optional[float]:
     if math.isfinite(result):
         return result
     return None
+
+
+def period_sort_key(period: str) -> tuple[int, int, str]:
+    text = period.strip()
+    compact = text.upper().replace(" ", "")
+
+    quarter_match = re.search(r"(\d{2,4})\D*Q([1-4])", compact)
+    if not quarter_match:
+        quarter_match = re.search(r"(\d{2,4})\D*第?([1-4])季", text)
+
+    year_match = re.search(r"(\d{2,4})", compact)
+    year = int(year_match.group(1)) if year_match else 0
+    if 1 <= year < 1911:
+        year += 1911
+
+    quarter = int(quarter_match.group(2)) if quarter_match else 0
+    return (year, quarter, text)
+
+
+def period_basis(period: str) -> str:
+    compact = period.upper().replace(" ", "")
+    if re.search(r"Q[1-4]|第?[1-4]季", compact):
+        return "單季"
+    return "期間"
 
 
 def load_csv(path: Path) -> list[PeriodData]:
@@ -135,7 +161,7 @@ def load_csv(path: Path) -> list[PeriodData]:
     if len(rows) < 2:
         raise ValueError("At least two periods are required for trend analysis.")
 
-    return rows
+    return sorted(rows, key=lambda row: period_sort_key(row.period))
 
 
 def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
@@ -178,6 +204,7 @@ def calculate_metrics(rows: Iterable[PeriodData]) -> list[MetricRow]:
                     if previous
                     else None
                 ),
+                period_basis=period_basis(row.period),
             )
         )
         previous = row
@@ -225,8 +252,8 @@ def build_findings(metrics: list[MetricRow]) -> list[str]:
         f"較前一期{direction(latest.net_margin, previous.net_margin)}。"
     )
     findings.append(
-        f"股東權益報酬率 ROE 為 {percentage(latest.roe)}，"
-        f"較前一期{direction(latest.roe, previous.roe)}。"
+        f"ROE 為 {percentage(latest.roe)}，ROA 為 {percentage(latest.roa)}；"
+        f"此處採 {latest.period_basis} 淨利 / 期末權益與資產，未做年化。"
     )
     findings.append(
         f"流動比率為 {number(latest.current_ratio)}，"
@@ -262,6 +289,49 @@ def build_risk_flags(metrics: list[MetricRow]) -> list[str]:
         flags.append("扣除資本支出後自由現金流為負。")
 
     return flags or ["目前未觸發主要規則式風險旗標。"]
+
+
+def audit_rows(rows: list[PeriodData]) -> list[str]:
+    warnings = []
+
+    for row in rows:
+        balance_total = row.total_liabilities + row.shareholders_equity
+        if row.total_assets:
+            gap_ratio = abs(row.total_assets - balance_total) / abs(row.total_assets)
+            if gap_ratio > 0.01:
+                warnings.append(
+                    f"{row.period}：資產總計與負債加權益不一致，請回查資產負債表欄位。"
+                )
+
+        if row.current_assets > row.total_assets:
+            warnings.append(
+                f"{row.period}：流動資產大於總資產，疑似抓錯資產總計或流動資產欄位。"
+            )
+        elif row.total_assets and row.current_assets / row.total_assets > 0.85:
+            warnings.append(
+                f"{row.period}：流動資產佔總資產超過 85%，若公司並非高度流動資產型產業，"
+                "請人工回查是否把資產總計抓成了其他小計。"
+            )
+
+        if row.current_liabilities > row.total_liabilities:
+            warnings.append(
+                f"{row.period}：流動負債大於總負債，疑似抓錯負債總計或流動負債欄位。"
+            )
+
+        if row.shareholders_equity and row.net_income / row.shareholders_equity > 0.2:
+            warnings.append(
+                f"{row.period}：單期 ROE 超過 20%，可能是高獲利，也可能是權益總計抓錯；"
+                "請以原始資產負債表覆核。"
+            )
+
+    sorted_periods = [row.period for row in sorted(rows, key=lambda item: period_sort_key(item.period))]
+    input_periods = [row.period for row in rows]
+    if input_periods != sorted_periods:
+        warnings.append(
+            "輸入期間已依年份與季度重新排序，避免把舊期間誤判為最新期間。"
+        )
+
+    return warnings
 
 
 def render_report(company: str, metrics: list[MetricRow], source: Path) -> str:
@@ -354,6 +424,10 @@ def main() -> int:
     rows = load_csv(args.input_csv)
     metrics = calculate_metrics(rows)
     report = render_report(args.company, metrics, args.input_csv)
+    audit_warnings = audit_rows(rows)
+    if audit_warnings:
+        warning_lines = "\n".join(f"- {warning}" for warning in audit_warnings)
+        report += "\n## 資料品質警示\n\n" + warning_lines + "\n"
     args.output.write_text(report, encoding="utf-8-sig")
     print(f"Wrote report to {args.output}")
     return 0
