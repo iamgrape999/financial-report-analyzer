@@ -15,6 +15,7 @@ import csv
 import json
 import mimetypes
 import os
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -109,6 +110,22 @@ STRICT_CODE_TERMS = {
     "shareholders_equity": ["3XXX"],
     "current_assets": ["11XX"],
     "current_liabilities": ["21XX"],
+}
+
+BALANCE_SHEET_FIELDS = {
+    "total_assets",
+    "total_liabilities",
+    "shareholders_equity",
+    "current_assets",
+    "current_liabilities",
+    "inventory",
+}
+
+QUARTER_END_MONTH_DAY = {
+    1: ("3", "31"),
+    2: ("6", "30"),
+    3: ("9", "30"),
+    4: ("12", "31"),
 }
 
 OPTIONAL_SOURCE_TERMS = {
@@ -492,6 +509,62 @@ def normalize_amount_text(value: Any) -> str:
     )
 
 
+def parse_period_year_quarter(period: Any) -> tuple[Optional[int], Optional[int]]:
+    text = str(period).strip()
+    compact = text.upper().replace(" ", "")
+
+    year_first = re.search(r"(\d{2,4})\D*Q([1-4])", text, re.IGNORECASE)
+    quarter_first = re.search(r"Q([1-4])\D*(\d{2,4})", text, re.IGNORECASE)
+    chinese_quarter = re.search(r"(\d{2,4})\D*第?([1-4])季", text)
+
+    if year_first:
+        return int(year_first.group(1)), int(year_first.group(2))
+    if quarter_first:
+        return int(quarter_first.group(2)), int(quarter_first.group(1))
+    if chinese_quarter:
+        return int(chinese_quarter.group(1)), int(chinese_quarter.group(2))
+
+    year_match = re.search(r"(\d{2,4})", compact)
+    quarter_match = re.search(r"Q([1-4])", compact)
+    year = int(year_match.group(1)) if year_match else None
+    quarter = int(quarter_match.group(1)) if quarter_match else None
+    return year, quarter
+
+
+def header_matches_period(field: str, period: Any, column_header: Any) -> bool:
+    if not column_header:
+        return False
+
+    year, quarter = parse_period_year_quarter(period)
+    if year is None:
+        return str(period).replace(" ", "") in str(column_header).replace(" ", "")
+
+    header = str(column_header)
+    compact_header = header.replace(" ", "").replace("　", "")
+    year_text = str(year)
+    if year_text not in compact_header:
+        return False
+
+    if quarter is None:
+        return True
+
+    if f"Q{quarter}" in compact_header.upper() or f"第{quarter}季" in compact_header:
+        return True
+
+    if field in BALANCE_SHEET_FIELDS:
+        month, day = QUARTER_END_MONTH_DAY[quarter]
+        return f"{month}月{day}日" in compact_header
+
+    # Income statement columns are periods. Accept common quarter ranges.
+    if quarter == 1:
+        return "1月1日" in compact_header and "3月31日" in compact_header
+    if quarter == 2:
+        return "4月1日" in compact_header and "6月30日" in compact_header
+    if quarter == 3:
+        return "7月1日" in compact_header and "9月30日" in compact_header
+    return "10月1日" in compact_header and "12月31日" in compact_header
+
+
 def value_matches_amount_text(value: Any, amount_text: Any) -> bool:
     if value is None:
         return amount_text in {None, ""}
@@ -552,9 +625,9 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
                 errors.append(
                     f"{period}：{field} 來源代碼為「{code}」，不符合必須代碼「{allowed_codes}」。"
                 )
-            if not column_header or str(period).replace(" ", "") not in str(column_header).replace(" ", ""):
+            if not header_matches_period(field, period, column_header):
                 errors.append(
-                    f"{period}：{field} 的欄位表頭證據為「{column_header}」，未明確對應期間「{period}」。"
+                    f"{period}：{field} 的欄位表頭證據為「{column_header}」，未能語義對應期間「{period}」。"
                 )
             if not value_matches_amount_text(value, amount_text):
                 errors.append(
