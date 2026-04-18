@@ -286,6 +286,8 @@ Do not invent, infer, calculate, or repair missing financial statement numbers. 
 Step 1: Anchor the period headers.
 - Locate period headers above numeric columns.
 - Taiwan statements usually place the latest period in the leftmost numeric column.
+- Important Taiwan quarterly layout rule: the balance sheet may contain three date columns, for example 114/3/31, 113/12/31, and 113/3/31, while the income statement may contain only two quarter columns, for example 114Q1 and 113Q1.
+- Do not ignore the middle balance sheet column. Give it its own period row, usually 113Q4, and set its income statement fields to 0 if no income statement amounts are visible for that period.
 - For Taiwan ROC years, 114Q1 is later than 113Q1. Never reverse them.
 - Use compact quarter period labels in the JSON period field. For example,
   use "114Q1" instead of "2025-03-31" or "民國 114 年 3 月 31 日".
@@ -306,6 +308,10 @@ Step 2: Extract only requested top-level accounts.
 - operating_income: 營業利益 / 營業淨利, code 6900.
 - net_income: 本期淨利歸屬於母公司業主, code 8610.
 - Use null when a field is not visible.
+
+- For balance sheet columns such as 114Q1, 113Q4, and 113Q1, return all three period rows.
+- For the middle 113Q4 balance sheet row, set revenue, gross_profit, operating_income, and net_income to 0 only when no income statement column for 113Q4 is visible.
+- The expected row order is chronological by period: 113Q1, 113Q4, 114Q1.
 
 Step 3: Self-check before returning JSON.
 - Verify selected period columns are not swapped.
@@ -455,11 +461,14 @@ function auditRows(rows) {
 }
 
 function calculateMetrics(rows) {
-  let previous = null;
+  let previousIncomeRow = null;
   return rows.map((row) => {
+    const hasIncomeStatementData = [row.revenue, row.gross_profit, row.operating_income, row.net_income].some(
+      (value) => Number(value) !== 0,
+    );
     const metric = {
       period: row.period,
-      revenue_growth: previous ? growthRate(row.revenue, previous.revenue) : null,
+      revenue_growth: hasIncomeStatementData && previousIncomeRow ? growthRate(row.revenue, previousIncomeRow.revenue) : null,
       gross_margin: divide(row.gross_profit, row.revenue),
       operating_margin: divide(row.operating_income, row.revenue),
       net_margin: divide(row.net_income, row.revenue),
@@ -472,7 +481,9 @@ function calculateMetrics(rows) {
           ? row.operating_cash_flow - row.capital_expenditure
           : null,
     };
-    previous = row;
+    if (hasIncomeStatementData) {
+      previousIncomeRow = row;
+    }
     return metric;
   });
 }
