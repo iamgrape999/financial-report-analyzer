@@ -5,8 +5,11 @@ param(
     [string]$Company = "Company",
     [string]$Repository = "iamgrape999/financial-report-analyzer",
     [string]$Branch = "main",
-    [string]$Model = "gpt-4.1-mini",
+    [ValidateSet("gemini", "openai")]
+    [string]$Provider = "gemini",
+    [string]$Model = "",
     [string]$OutputFolder = "",
+    [bool]$RequireCleanAudit = $true,
     [switch]$UploadImages
 )
 
@@ -24,7 +27,12 @@ function Convert-SecureStringToPlainText {
     }
 }
 
-if (-not $env:OPENAI_API_KEY) {
+if ($Provider -eq "gemini" -and -not $env:GEMINI_API_KEY) {
+    $geminiKey = Read-Host "Gemini API key" -AsSecureString
+    $env:GEMINI_API_KEY = Convert-SecureStringToPlainText -SecureText $geminiKey
+}
+
+if ($Provider -eq "openai" -and -not $env:OPENAI_API_KEY) {
     $openAiKey = Read-Host "OpenAI API key" -AsSecureString
     $env:OPENAI_API_KEY = Convert-SecureStringToPlainText -SecureText $openAiKey
 }
@@ -155,12 +163,20 @@ $reportOutput = Join-Path -Path $localOutputFolder -ChildPath "screenshot_report
 
 $python = Get-PythonCommand
 $scriptPath = Join-Path -Path (Get-Location) -ChildPath "analyze_financial_screenshots.py"
+$modelArgs = @()
+if ($Model) {
+    $modelArgs = @("--model", $Model)
+}
+$auditArgs = @()
+if ($RequireCleanAudit) {
+    $auditArgs = @("--fail-on-audit-warning")
+}
 
 Write-Host "Analyzing screenshots..."
-& $python $scriptPath @Images -c $Company --model $Model --csv-output $csvOutput -o $reportOutput
+& $python $scriptPath @Images -c $Company --provider $Provider @modelArgs --csv-output $csvOutput -o $reportOutput @auditArgs
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Screenshot analysis failed."
+    throw "Screenshot analysis failed or data-quality audit warnings require review. Local outputs were kept in $localOutputFolder"
 }
 
 $headers = @{
