@@ -70,6 +70,7 @@ powershell -ExecutionPolicy Bypass -File ".\analyze_and_upload_to_github.ps1" -I
 - 讀取截圖
 - 產生 `extracted_financials.csv`
 - 產生 `extracted_sources.json`
+- 產生 `extracted_raw.json`
 - 產生 `screenshot_report.md`
 - 上傳到 GitHub 的 `reports/<時間>-<公司名稱>/` 資料夾
 
