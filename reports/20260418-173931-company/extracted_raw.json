@@ -1,0 +1,98 @@
+{
+  "company": "台灣積體電路製造股份有限公司",
+  "currency_unit": "新台幣仟元",
+  "periods": [
+    {
+      "period": "114Q1",
+      "revenue": 839253664,
+      "gross_profit": 493395076,
+      "operating_income": 407080808,
+      "net_income": 360732661,
+      "total_assets": 9993420830,
+      "total_liabilities": 2531662963,
+      "shareholders_equity": 7461757867,
+      "current_assets": 3293387855,
+      "current_liabilities": 1073082780,
+      "inventory": 59943500,
+      "operating_cash_flow": null,
+      "capital_expenditure": null,
+      "sources": {
+        "revenue": "營業收入淨額",
+        "gross_profit": "營業毛利",
+        "operating_income": "營業利益",
+        "net_income": "本期淨利",
+        "total_assets": "資產總計",
+        "total_liabilities": "負債總計",
+        "shareholders_equity": "權益總計",
+        "current_assets": "流動資產合計",
+        "current_liabilities": "流動負債合計",
+        "inventory": "存貨",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      },
+      "codes": {
+        "revenue": "4000",
+        "gross_profit": "5950",
+        "operating_income": "6900",
+        "net_income": "8200",
+        "total_assets": "1XXX",
+        "total_liabilities": "2XXX",
+        "shareholders_equity": "3XXX",
+        "current_assets": "11XX",
+        "current_liabilities": "21XX",
+        "inventory": "18XX",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      }
+    },
+    {
+      "period": "113Q1",
+      "revenue": 592644201,
+      "gross_profit": 314505269,
+      "operating_income": 249018306,
+      "net_income": 225221263,
+      "total_assets": 8707087580,
+      "total_liabilities": 2172174828,
+      "shareholders_equity": 6534912752,
+      "current_assets": 2869520526,
+      "current_liabilities": 817025979,
+      "inventory": 63279274,
+      "operating_cash_flow": null,
+      "capital_expenditure": null,
+      "sources": {
+        "revenue": "營業收入淨額",
+        "gross_profit": "營業毛利",
+        "operating_income": "營業利益",
+        "net_income": "本期淨利",
+        "total_assets": "資產總計",
+        "total_liabilities": "負債總計",
+        "shareholders_equity": "權益總計",
+        "current_assets": "流動資產合計",
+        "current_liabilities": "流動負債合計",
+        "inventory": "存貨",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      },
+      "codes": {
+        "revenue": "4000",
+        "gross_profit": "5950",
+        "operating_income": "6900",
+        "net_income": "8200",
+        "total_assets": "1XXX",
+        "total_liabilities": "2XXX",
+        "shareholders_equity": "3XXX",
+        "current_assets": "11XX",
+        "current_liabilities": "21XX",
+        "inventory": "18XX",
+        "operating_cash_flow": null,
+        "capital_expenditure": null
+      }
+    }
+  ],
+  "warnings": [
+    "operating_cash_flow is not visible in the provided statements for period 114Q1.",
+    "capital_expenditure is not visible in the provided statements for period 114Q1.",
+    "operating_cash_flow is not visible in the provided statements for period 113Q1.",
+    "capital_expenditure is not visible in the provided statements for period 113Q1."
+  ]
+}
