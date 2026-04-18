@@ -48,6 +48,36 @@ OUTPUT_COLUMNS = [
     "capital_expenditure",
 ]
 
+SOURCE_COLUMNS = [column for column in OUTPUT_COLUMNS if column != "period"]
+
+SOURCE_FIELD_SCHEMA = {
+    column: {"type": ["string", "null"]} for column in SOURCE_COLUMNS
+}
+
+GEMINI_SOURCE_FIELD_SCHEMA = {
+    column: {"type": "STRING", "nullable": True} for column in SOURCE_COLUMNS
+}
+
+STRICT_SOURCE_TERMS = {
+    "total_assets": ["資產總計", "資產總額", "資產合計"],
+    "total_liabilities": ["負債總計", "負債總額", "負債合計"],
+    "shareholders_equity": ["權益總計", "權益總額", "權益合計"],
+    "current_assets": ["流動資產合計", "流動資產總計", "流動資產總額"],
+    "current_liabilities": ["流動負債合計", "流動負債總計", "流動負債總額"],
+}
+
+OPTIONAL_SOURCE_TERMS = {
+    "revenue": ["營業收入", "營業收入合計", "營業收入淨額"],
+    "gross_profit": ["營業毛利", "營業毛利淨額", "毛利"],
+    "operating_income": ["營業利益", "營業利益合計"],
+    "net_income": ["本期淨利", "本期淨利歸屬於母公司業主", "淨利"],
+    "inventory": ["存貨", "存貨合計"],
+    "operating_cash_flow": ["營業活動之淨現金流入", "營業活動現金流量"],
+    "capital_expenditure": ["取得不動產、廠房及設備", "資本支出"],
+}
+
+DISALLOWED_EQUITY_SOURCE_TERMS = ["股本", "保留盈餘", "母公司業主權益", "非控制權益"]
+
 
 EXTRACTION_SCHEMA = {
     "type": "object",
@@ -65,8 +95,16 @@ EXTRACTION_SCHEMA = {
                     for column in OUTPUT_COLUMNS
                     if column != "period"
                 }
-                | {"period": {"type": "string"}},
-                "required": OUTPUT_COLUMNS,
+                | {
+                    "period": {"type": "string"},
+                    "sources": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": SOURCE_FIELD_SCHEMA,
+                        "required": SOURCE_COLUMNS,
+                    },
+                },
+                "required": OUTPUT_COLUMNS + ["sources"],
             },
         },
         "warnings": {"type": "array", "items": {"type": "string"}},
@@ -97,9 +135,15 @@ GEMINI_RESPONSE_SCHEMA = {
                     "inventory": {"type": "NUMBER", "nullable": True},
                     "operating_cash_flow": {"type": "NUMBER", "nullable": True},
                     "capital_expenditure": {"type": "NUMBER", "nullable": True},
+                    "sources": {
+                        "type": "OBJECT",
+                        "properties": GEMINI_SOURCE_FIELD_SCHEMA,
+                        "required": SOURCE_COLUMNS,
+                        "propertyOrdering": SOURCE_COLUMNS,
+                    },
                 },
-                "required": OUTPUT_COLUMNS,
-                "propertyOrdering": OUTPUT_COLUMNS,
+                "required": OUTPUT_COLUMNS + ["sources"],
+                "propertyOrdering": OUTPUT_COLUMNS + ["sources"],
             },
         },
         "warnings": {"type": "ARRAY", "items": {"type": "STRING"}},
@@ -163,6 +207,10 @@ Extraction rules:
 - Preserve the statement unit. If the report says amounts are in thousands,
   return the numbers exactly as shown in that unit and set currency_unit.
 - Use null when a field is not visible in the screenshots.
+- For every numeric field, return its exact source account label in sources.
+  Example: total_assets sources must be 資產總計, not a nearby subtotal.
+  If you cannot point to a specific account label, set the value to null and
+  the source to null.
 - revenue means operating revenue.
 - gross_profit means gross profit.
 - operating_income means operating income.
@@ -311,6 +359,73 @@ def format_csv_value(value: Any) -> str:
     return str(value)
 
 
+def normalize_source(source: Any) -> str:
+    if source is None:
+        return ""
+    return str(source).replace(" ", "").replace("　", "").strip()
+
+
+def source_matches(source: Any, allowed_terms: list[str]) -> bool:
+    normalized = normalize_source(source)
+    return any(term.replace(" ", "") in normalized for term in allowed_terms)
+
+
+def validate_sources(extraction: dict[str, Any]) -> list[str]:
+    errors = []
+    periods = extraction.get("periods", [])
+
+    for row in periods:
+        period = row.get("period", "unknown period")
+        sources = row.get("sources") or {}
+
+        for field, allowed_terms in STRICT_SOURCE_TERMS.items():
+            value = row.get(field)
+            source = sources.get(field)
+            if value is None:
+                errors.append(f"{period}：{field} 缺值，必須由明確會計科目萃取。")
+                continue
+            if not source_matches(source, allowed_terms):
+                allowed = " / ".join(allowed_terms)
+                errors.append(
+                    f"{period}：{field} 來源科目為「{source}」，不符合必須來源「{allowed}」。"
+                )
+
+        equity_source = normalize_source(sources.get("shareholders_equity"))
+        if any(term in equity_source for term in DISALLOWED_EQUITY_SOURCE_TERMS):
+            errors.append(
+                f"{period}：shareholders_equity 來源不可只用「{sources.get('shareholders_equity')}」，"
+                "必須是權益總計 / 權益總額。"
+            )
+
+        for field, allowed_terms in OPTIONAL_SOURCE_TERMS.items():
+            value = row.get(field)
+            source = sources.get(field)
+            if value is None and source:
+                errors.append(f"{period}：{field} 數值為空，但來源科目卻填了「{source}」。")
+            if value is not None and source and not source_matches(source, allowed_terms):
+                allowed = " / ".join(allowed_terms)
+                errors.append(
+                    f"{period}：{field} 來源科目為「{source}」，建議來源應為「{allowed}」。"
+                )
+
+    return errors
+
+
+def write_sources(extraction: dict[str, Any], output_json: Path) -> None:
+    source_rows = []
+    for row in extraction.get("periods", []):
+        source_rows.append(
+            {
+                "period": row.get("period"),
+                "sources": row.get("sources") or {},
+            }
+        )
+    output_json.write_text(
+        json.dumps(source_rows, ensure_ascii=False, indent=2),
+        encoding="utf-8-sig",
+    )
+
+
 def write_csv(extraction: dict[str, Any], output_csv: Path) -> None:
     periods = extraction.get("periods", [])
     if len(periods) < 2:
@@ -347,6 +462,12 @@ def main() -> int:
         help="Where to save extracted structured financial data.",
     )
     parser.add_argument(
+        "--sources-output",
+        type=Path,
+        default=Path("extracted_sources.json"),
+        help="Where to save source account labels for extracted fields.",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=Path,
@@ -369,6 +490,23 @@ def main() -> int:
         extraction = call_gemini(images, args.company, model)
     else:
         extraction = call_openai(images, args.company, model)
+
+    source_errors = validate_sources(extraction)
+    write_sources(extraction, args.sources_output)
+    if source_errors:
+        error_report = "\n".join(f"- {error}" for error in source_errors)
+        args.output.write_text(
+            "# 財報截圖萃取失敗\n\n"
+            "以下欄位未能對應到允許的明確會計科目，因此未產生正式分析報告：\n\n"
+            f"{error_report}\n",
+            encoding="utf-8-sig",
+        )
+        print(f"Wrote source labels to {args.sources_output}")
+        print(f"Wrote validation failure report to {args.output}")
+        raise RuntimeError(
+            "Source account validation failed. Review the failure report before uploading."
+        )
+
     write_csv(extraction, args.csv_output)
 
     company = args.company or extraction.get("company") or "Company"
