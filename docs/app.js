@@ -262,6 +262,8 @@ Step 1: Anchor the period headers.
 - Locate period headers above numeric columns.
 - Taiwan statements usually place the latest period in the leftmost numeric column.
 - For Taiwan ROC years, 114Q1 is later than 113Q1. Never reverse them.
+- Use compact quarter period labels in the JSON period field. For example,
+  use "114Q1" instead of "2025-03-31" or "民國 114 年 3 月 31 日".
 - The amount must come from the intersection of the same account row and the selected period column.
 
 Step 2: Extract only requested top-level accounts.
@@ -315,7 +317,7 @@ function validateSources(extraction) {
       if (!matchesAny(source, terms)) {
         errors.push(`${period}: ${field} 來源科目「${source}」不符合 ${terms.join(" / ")}。`);
       }
-      if (strictCodeTerms[field] && !matchesAny(code, strictCodeTerms[field])) {
+      if (strictCodeTerms[field] && !matchesAny(code, strictCodeTerms[field]) && !hasStrongRowEvidence(source, evidence)) {
         errors.push(`${period}: ${field} 來源代碼「${code}」不符合 ${strictCodeTerms[field].join(" / ")}。`);
       }
       if (!headerMatchesPeriod(field, period, evidence.column_header)) {
@@ -332,6 +334,12 @@ function validateSources(extraction) {
   return errors;
 }
 
+function hasStrongRowEvidence(source, evidence) {
+  const normalizedSource = String(source || "").replace(/\s/g, "");
+  const rowText = String(evidence?.row_values_text || "").replace(/\s/g, "");
+  return Boolean(normalizedSource && rowText.includes(normalizedSource));
+}
+
 function normalizeRows(rows) {
   return [...rows].sort((a, b) => comparePeriod(a.period, b.period));
 }
@@ -344,6 +352,17 @@ function comparePeriod(a, b) {
 
 function parsePeriod(period) {
   const text = String(period || "");
+  const isoDate = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDate) {
+    const year = Number(isoDate[1]);
+    const month = Number(isoDate[2]);
+    const day = Number(isoDate[3]);
+    if (month === 3 && day === 31) return [year, 1];
+    if (month === 6 && day === 30) return [year, 2];
+    if (month === 9 && day === 30) return [year, 3];
+    if (month === 12 && day === 31) return [year, 4];
+  }
+
   const yearMatch = text.match(/(\d{2,4})/);
   const quarterMatch = text.match(/Q([1-4])|第?([1-4])季/i);
   let year = yearMatch ? Number(yearMatch[1]) : 0;
