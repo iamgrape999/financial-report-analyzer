@@ -159,6 +159,7 @@ $localOutputFolder = Join-Path -Path (Get-Location) -ChildPath $OutputFolder
 New-Item -ItemType Directory -Force -Path $localOutputFolder | Out-Null
 
 $csvOutput = Join-Path -Path $localOutputFolder -ChildPath "extracted_financials.csv"
+$sourcesOutput = Join-Path -Path $localOutputFolder -ChildPath "extracted_sources.json"
 $reportOutput = Join-Path -Path $localOutputFolder -ChildPath "screenshot_report.md"
 
 $python = Get-PythonCommand
@@ -173,7 +174,7 @@ if ($RequireCleanAudit) {
 }
 
 Write-Host "Analyzing screenshots..."
-& $python $scriptPath @Images -c $Company --provider $Provider @modelArgs --csv-output $csvOutput -o $reportOutput @auditArgs
+& $python $scriptPath @Images -c $Company --provider $Provider @modelArgs --csv-output $csvOutput --sources-output $sourcesOutput -o $reportOutput @auditArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "Screenshot analysis failed or data-quality audit warnings require review. Local outputs were kept in $localOutputFolder"
@@ -190,6 +191,13 @@ Send-GitHubFile `
     -RepositoryName $Repository `
     -LocalPath $csvOutput `
     -RemotePath "$OutputFolder/extracted_financials.csv" `
+    -Headers $headers `
+    -TargetBranch $Branch
+
+Send-GitHubFile `
+    -RepositoryName $Repository `
+    -LocalPath $sourcesOutput `
+    -RemotePath "$OutputFolder/extracted_sources.json" `
     -Headers $headers `
     -TargetBranch $Branch
 
