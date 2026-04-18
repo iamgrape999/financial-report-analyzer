@@ -58,12 +58,28 @@ GEMINI_SOURCE_FIELD_SCHEMA = {
     column: {"type": "STRING", "nullable": True} for column in SOURCE_COLUMNS
 }
 
+CODE_FIELD_SCHEMA = {
+    column: {"type": ["string", "null"]} for column in SOURCE_COLUMNS
+}
+
+GEMINI_CODE_FIELD_SCHEMA = {
+    column: {"type": "STRING", "nullable": True} for column in SOURCE_COLUMNS
+}
+
 STRICT_SOURCE_TERMS = {
     "total_assets": ["資產總計", "資產總額", "資產合計"],
     "total_liabilities": ["負債總計", "負債總額", "負債合計"],
     "shareholders_equity": ["權益總計", "權益總額", "權益合計"],
     "current_assets": ["流動資產合計", "流動資產總計", "流動資產總額"],
     "current_liabilities": ["流動負債合計", "流動負債總計", "流動負債總額"],
+}
+
+STRICT_CODE_TERMS = {
+    "total_assets": ["1XXX"],
+    "total_liabilities": ["2XXX"],
+    "shareholders_equity": ["3XXX"],
+    "current_assets": ["11XX"],
+    "current_liabilities": ["21XX"],
 }
 
 OPTIONAL_SOURCE_TERMS = {
@@ -103,8 +119,14 @@ EXTRACTION_SCHEMA = {
                         "properties": SOURCE_FIELD_SCHEMA,
                         "required": SOURCE_COLUMNS,
                     },
+                    "codes": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": CODE_FIELD_SCHEMA,
+                        "required": SOURCE_COLUMNS,
+                    },
                 },
-                "required": OUTPUT_COLUMNS + ["sources"],
+                "required": OUTPUT_COLUMNS + ["sources", "codes"],
             },
         },
         "warnings": {"type": "array", "items": {"type": "string"}},
@@ -141,9 +163,15 @@ GEMINI_RESPONSE_SCHEMA = {
                         "required": SOURCE_COLUMNS,
                         "propertyOrdering": SOURCE_COLUMNS,
                     },
+                    "codes": {
+                        "type": "OBJECT",
+                        "properties": GEMINI_CODE_FIELD_SCHEMA,
+                        "required": SOURCE_COLUMNS,
+                        "propertyOrdering": SOURCE_COLUMNS,
+                    },
                 },
-                "required": OUTPUT_COLUMNS + ["sources"],
-                "propertyOrdering": OUTPUT_COLUMNS + ["sources"],
+                "required": OUTPUT_COLUMNS + ["sources", "codes"],
+                "propertyOrdering": OUTPUT_COLUMNS + ["sources", "codes"],
             },
         },
         "warnings": {"type": "ARRAY", "items": {"type": "STRING"}},
@@ -211,6 +239,9 @@ Extraction rules:
   Example: total_assets sources must be 資產總計, not a nearby subtotal.
   If you cannot point to a specific account label, set the value to null and
   the source to null.
+- Also return the exact account code shown at the left of that same source row
+  in codes, such as 1XXX, 11XX, 2XXX, 21XX, or 3XXX. If no code is visible, set
+  the code to null.
 - If a valid source account label is found, read the amount from the same row
   under each requested period column. Do not return a source label with a null
   value unless that period's amount is genuinely not visible.
@@ -224,11 +255,16 @@ Extraction rules:
   otherwise use net income.
 - total_assets must be read from the explicit row 資產總計 / 資產總額.
   Never infer it from liabilities plus equity.
+- total_assets must use account code 1XXX.
 - total_liabilities must be read from the explicit row 負債總計 / 負債總額.
+- total_liabilities must use account code 2XXX.
 - shareholders_equity must be read from the explicit row 權益總計 / 權益總額.
   Do not use 股本, 保留盈餘, or 母公司業主權益 unless it is clearly the total equity row.
+- shareholders_equity must use account code 3XXX.
 - current_assets must be read from 流動資產合計.
+- current_assets must use account code 11XX.
 - current_liabilities must be read from 流動負債合計.
+- current_liabilities must use account code 21XX.
 - inventory means inventories.
 - After extraction, verify:
   total_assets approximately equals total_liabilities + shareholders_equity.
@@ -376,6 +412,11 @@ def source_matches(source: Any, allowed_terms: list[str]) -> bool:
     return any(term.replace(" ", "") in normalized for term in allowed_terms)
 
 
+def code_matches(code: Any, allowed_terms: list[str]) -> bool:
+    normalized = normalize_source(code).upper()
+    return any(term.upper() == normalized for term in allowed_terms)
+
+
 def validate_sources(extraction: dict[str, Any]) -> list[str]:
     errors = []
     periods = extraction.get("periods", [])
@@ -383,10 +424,12 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
     for row in periods:
         period = row.get("period", "unknown period")
         sources = row.get("sources") or {}
+        codes = row.get("codes") or {}
 
         for field, allowed_terms in STRICT_SOURCE_TERMS.items():
             value = row.get(field)
             source = sources.get(field)
+            code = codes.get(field)
             if value is None:
                 if source:
                     errors.append(
@@ -400,6 +443,11 @@ def validate_sources(extraction: dict[str, Any]) -> list[str]:
                 allowed = " / ".join(allowed_terms)
                 errors.append(
                     f"{period}：{field} 來源科目為「{source}」，不符合必須來源「{allowed}」。"
+                )
+            if not code_matches(code, STRICT_CODE_TERMS[field]):
+                allowed_codes = " / ".join(STRICT_CODE_TERMS[field])
+                errors.append(
+                    f"{period}：{field} 來源代碼為「{code}」，不符合必須代碼「{allowed_codes}」。"
                 )
 
         equity_source = normalize_source(sources.get("shareholders_equity"))
@@ -430,6 +478,7 @@ def write_sources(extraction: dict[str, Any], output_json: Path) -> None:
             {
                 "period": row.get("period"),
                 "sources": row.get("sources") or {},
+                "codes": row.get("codes") or {},
             }
         )
     output_json.write_text(
