@@ -56,7 +56,6 @@ const downloadJson = document.querySelector("#download-json");
 
 imagesInput.addEventListener("change", () => {
   selectedFiles = mergeFiles(selectedFiles, Array.from(imagesInput.files));
-  imagesInput.value = "";
   renderPreview();
 });
 
@@ -68,12 +67,21 @@ clearImages.addEventListener("click", () => {
 
 function renderPreview() {
   preview.innerHTML = "";
-  for (const file of selectedFiles) {
+  const files = getSelectedImageFiles();
+  for (const file of files) {
     const image = document.createElement("img");
     image.alt = file.name;
     image.src = URL.createObjectURL(file);
     preview.append(image);
   }
+  if (files.length) {
+    setStatus(`已選取 ${files.length} 張圖片。`);
+  }
+}
+
+function getSelectedImageFiles() {
+  const inputFiles = Array.from(imagesInput.files || []);
+  return selectedFiles.length ? selectedFiles : inputFiles;
 }
 
 function mergeFiles(existing, incoming) {
@@ -98,7 +106,7 @@ form.addEventListener("submit", async (event) => {
     const apiKey = document.querySelector("#api-key").value.trim();
     const company = document.querySelector("#company").value.trim();
     const model = document.querySelector("#model").value.trim();
-    const files = selectedFiles;
+    const files = getSelectedImageFiles();
 
     if (!files.length) {
       throw new Error("請先選擇財報截圖。");
